@@ -11,7 +11,7 @@ import { NumberDetailsModal } from './components/NumberDetailsModal';
 import { PaymentModal } from './components/PaymentModal';
 import { PaymentSuccessModal } from './components/PaymentSuccessModal';
 import { AuthModal } from './components/AuthModal';
-import { Home, ShoppingCart, Smartphone, CreditCard, User } from 'lucide-react';
+import { Home, ShoppingCart, Smartphone, CreditCard, User, Sparkles } from 'lucide-react';
 import {
   supabase,
   INITIAL_NUMBERS,
@@ -183,6 +183,21 @@ export function App() {
     }
   };
 
+  const handleTabChange = (tab: string) => {
+    if (!isLoggedIn && (tab === 'my-numbers' || tab === 'payments' || tab === 'profile')) {
+      handleOpenAuth('login');
+      return;
+    }
+    setCurrentTab(tab);
+  };
+
+  // Redirect to home if user is logged out while on a private dashboard tab
+  useEffect(() => {
+    if (!isLoggedIn && (currentTab === 'my-numbers' || currentTab === 'payments' || currentTab === 'profile')) {
+      setCurrentTab('home');
+    }
+  }, [isLoggedIn, currentTab]);
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -200,7 +215,7 @@ export function App() {
       {/* Top Global Navigation Bar */}
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleTabChange}
         isLoggedIn={isLoggedIn}
         userName={userName}
         onOpenAuth={handleOpenAuth}
@@ -209,11 +224,11 @@ export function App() {
 
       {/* UNIFIED RESPONSIVE APPLICATION (DESKTOP & MOBILE FRIENDLY) */}
       <div className="dashboard-layout-wrapper">
-        {/* Dark Navy Sidebar for Dashboard navigation on Desktop */}
-        {currentTab !== 'home' && (
+        {/* Dark Navy Sidebar for Dashboard navigation on Desktop - ONLY when logged in */}
+        {isLoggedIn && currentTab !== 'home' && (
           <Sidebar
             currentTab={currentTab}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleTabChange}
             onLogout={handleLogout}
             myNumbersCount={userNumbers.filter((n) => n.status === 'Active').length}
           />
@@ -244,7 +259,7 @@ export function App() {
             />
           )}
 
-          {/* TAB: MY NUMBERS */}
+          {/* TAB: MY NUMBERS (Protected) */}
           {currentTab === 'my-numbers' && (
             <MyNumbersView
               userNumbers={userNumbers}
@@ -252,7 +267,7 @@ export function App() {
             />
           )}
 
-          {/* TAB: PAYMENTS */}
+          {/* TAB: PAYMENTS (Protected) */}
           {currentTab === 'payments' && (
             <PaymentsView
               transactions={transactions}
@@ -260,13 +275,14 @@ export function App() {
             />
           )}
 
-          {/* TAB: PROFILE */}
+          {/* TAB: PROFILE (Protected) */}
           {currentTab === 'profile' && (
             <ProfileView
               userName={userName}
               userEmail={userEmail}
-              onNavigateTab={(tab) => setCurrentTab(tab)}
+              onNavigateTab={handleTabChange}
               onLogout={handleLogout}
+              activeNumbersCount={userNumbers.filter((n) => n.status === 'Active').length}
             />
           )}
 
@@ -274,7 +290,7 @@ export function App() {
           {currentTab === 'features' && (
             <div className="animate-fade-in" style={{ padding: '20px' }}>
               <h1 className="main-page-title">Platform Features & Security</h1>
-              <p className="main-page-sub">Enterprise-grade VoIP & GSM infrastructure backed by Supabase.</p>
+              <p className="main-page-sub">Enterprise-grade VoIP & GSM infrastructure backed by automated webhooks.</p>
               <div className="why-choose-us-section" style={{ marginTop: '24px' }}>
                 <div className="features-three-grid">
                   <div className="feature-item-box">
@@ -299,43 +315,64 @@ export function App() {
         </main>
       </div>
 
-      {/* MOBILE RESPONSIVE BOTTOM NAVIGATION BAR (Auto visible on smartphones) */}
+      {/* MOBILE RESPONSIVE BOTTOM NAVIGATION BAR */}
       <nav className="mobile-responsive-bottom-bar" aria-label="Mobile Navigation">
         <button
           className={`mob-bar-btn ${currentTab === 'home' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('home')}
+          onClick={() => handleTabChange('home')}
         >
           <Home size={20} />
           <span>Home</span>
         </button>
         <button
           className={`mob-bar-btn ${currentTab === 'buy' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('buy')}
+          onClick={() => handleTabChange('buy')}
         >
           <ShoppingCart size={20} />
           <span>Buy</span>
         </button>
-        <button
-          className={`mob-bar-btn ${currentTab === 'my-numbers' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('my-numbers')}
-        >
-          <Smartphone size={20} />
-          <span>My Numbers</span>
-        </button>
-        <button
-          className={`mob-bar-btn ${currentTab === 'payments' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('payments')}
-        >
-          <CreditCard size={20} />
-          <span>Payments</span>
-        </button>
-        <button
-          className={`mob-bar-btn ${currentTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('profile')}
-        >
-          <User size={20} />
-          <span>Profile</span>
-        </button>
+        {isLoggedIn ? (
+          <>
+            <button
+              className={`mob-bar-btn ${currentTab === 'my-numbers' ? 'active' : ''}`}
+              onClick={() => handleTabChange('my-numbers')}
+            >
+              <Smartphone size={20} />
+              <span>Numbers</span>
+            </button>
+            <button
+              className={`mob-bar-btn ${currentTab === 'payments' ? 'active' : ''}`}
+              onClick={() => handleTabChange('payments')}
+            >
+              <CreditCard size={20} />
+              <span>Payments</span>
+            </button>
+            <button
+              className={`mob-bar-btn ${currentTab === 'profile' ? 'active' : ''}`}
+              onClick={() => handleTabChange('profile')}
+            >
+              <User size={20} />
+              <span>Profile</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className={`mob-bar-btn ${currentTab === 'features' ? 'active' : ''}`}
+              onClick={() => handleTabChange('features')}
+            >
+              <Sparkles size={20} />
+              <span>Features</span>
+            </button>
+            <button
+              className="mob-bar-btn"
+              onClick={() => handleOpenAuth('login')}
+            >
+              <User size={20} />
+              <span>Login</span>
+            </button>
+          </>
+        )}
       </nav>
 
       {/* MODALS */}

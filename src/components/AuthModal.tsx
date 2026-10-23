@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Phone, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Phone, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -26,6 +26,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  useEffect(() => {
+    setMode(initialMode);
+    setFeedback(null);
+  }, [initialMode, isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,83 +54,96 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           },
         });
 
-        if (authErr && !authErr.message.includes('already registered')) {
-          console.warn('Supabase auth signup notice:', authErr.message);
+        if (authErr && !authErr.message.toLowerCase().includes('already registered')) {
+          setFeedback({
+            type: 'error',
+            message: authErr.message || 'Signup failed. Please try again.',
+          });
+          setIsLoading(false);
+          return;
         }
 
-        // 2. Direct insert into Supabase 'profiles' table so data appears immediately in Supabase!
-        const { error: profileErr } = await supabase.from('profiles').insert([
-          {
-            email: email,
-            full_name: name,
-            phone_number: phone,
-            auth_id: authData?.user?.id || null,
-            last_login: new Date().toISOString(),
-          },
-        ]);
-
-        if (profileErr) {
-          console.warn('Profiles table insert notice:', profileErr.message);
+        // 2. Insert into 'profiles' table
+        try {
+          await supabase.from('profiles').insert([
+            {
+              email: email,
+              full_name: name,
+              phone_number: phone,
+              auth_id: authData?.user?.id || null,
+              last_login: new Date().toISOString(),
+            },
+          ]);
+        } catch (e) {
+          console.warn('Profiles table sync:', e);
         }
 
         // 3. Insert into 'login_history' table
-        await supabase.from('login_history').insert([
-          {
-            user_email: email,
-            full_name: name,
-            auth_provider: 'signup_form',
-          },
-        ]);
+        try {
+          await supabase.from('login_history').insert([
+            {
+              user_email: email,
+              full_name: name,
+              auth_provider: 'signup_form',
+            },
+          ]);
+        } catch (e) {
+          console.warn('Login history record:', e);
+        }
 
+        // IMPORTANT REQUIREMENT: Do NOT open dashboard directly on signup.
+        // Prompt user to log in first!
         setFeedback({
           type: 'success',
-          message: 'Account created & saved to Supabase database successfully!',
+          message: 'Account created successfully! Please enter your password to log in.',
         });
-
-        setTimeout(() => {
-          onLoginSuccess({
-            name,
-            email,
-          });
-          onClose();
-        }, 1200);
+        setPassword('');
+        setMode('login');
 
       } else {
         // Mode: Login
-        // 1. Supabase Auth signIn
         const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (authErr) {
+          // Check if fallback works or show friendly error
           console.warn('Supabase signIn notice:', authErr.message);
+          setFeedback({
+            type: 'error',
+            message: authErr.message || 'Invalid email or password. Please try again.',
+          });
+          setIsLoading(false);
+          return;
         }
 
-        // 2. Update profile or insert if first time
         const displayName = authData?.user?.user_metadata?.full_name || name || email.split('@')[0];
-        
-        await supabase.from('profiles').upsert([
-          {
-            email: email,
-            full_name: displayName,
-            phone_number: phone,
-            last_login: new Date().toISOString(),
-          },
-        ], { onConflict: 'email' });
 
-        // 3. Record in login_history table in Supabase
-        await supabase.from('login_history').insert([
-          {
-            user_email: email,
-            full_name: displayName,
-            auth_provider: 'email_password',
-          },
-        ]);
+        try {
+          await supabase.from('profiles').upsert([
+            {
+              email: email,
+              full_name: displayName,
+              phone_number: phone,
+              last_login: new Date().toISOString(),
+            },
+          ], { onConflict: 'email' });
+
+          await supabase.from('login_history').insert([
+            {
+              user_email: email,
+              full_name: displayName,
+              auth_provider: 'email_password',
+            },
+          ]);
+        } catch (e) {
+          console.warn('Profile sync:', e);
+        }
 
         setFeedback({
           type: 'success',
-          message: 'Logged in successfully! Data recorded in Supabase.',
+          message: 'Login successful! Opening dashboard...',
         });
 
         setTimeout(() => {
@@ -134,21 +152,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             email,
           });
           onClose();
-        }, 800);
+        }, 700);
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      // Fallback grace
-      onLoginSuccess({
-        name: mode === 'signup' ? name : 'John Doe',
-        email,
+      setFeedback({
+        type: 'error',
+        message: 'An unexpected error occurred. Please try again.',
       });
-      onClose();
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="modal-backdrop-overlay" onClick={onClose}>
@@ -160,10 +175,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
           <h2 className="auth-main-title">Virtual Number</h2>
           <p className="auth-sub-desc">
-            {mode === 'login' ? 'Login to your account' : 'Create your account'}
+            {mode === 'login' ? 'Welcome back! Log in to access your account' : 'Create your free account in seconds'}
           </p>
-          <div className="supabase-connected-tag" style={{ fontSize: '11px', color: '#10b981', fontWeight: 600, marginTop: '4px' }}>
-            ● Supabase Database Sync Active
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#10b981', fontWeight: 600, marginTop: '4px' }}>
+            <ShieldCheck size={14} /> 256-Bit Encrypted & Secure
           </div>
         </div>
 
@@ -223,7 +238,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               border: `1px solid ${feedback.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
             }}
           >
-            {feedback.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {feedback.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
             <span>{feedback.message}</span>
           </div>
         )}
@@ -247,7 +262,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <Mail size={18} className="field-icon" />
             <input
               type="text"
-              placeholder={mode === 'login' ? 'Email or Username' : 'Email Address'}
+              placeholder={mode === 'login' ? 'Email Address' : 'Email Address'}
               value={emailOrPhone}
               onChange={(e) => setEmailOrPhone(e.target.value)}
               required
@@ -259,10 +274,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <Phone size={18} className="field-icon" />
               <input
                 type="tel"
-                placeholder="Phone Number"
+                placeholder="Mobile Number (Optional)"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                required
               />
             </div>
           )}
@@ -294,11 +308,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <button type="submit" className="btn-auth-submit" disabled={isLoading}>
-            {isLoading ? 'Saving to Supabase...' : mode === 'login' ? 'Login' : 'Sign Up'}
+            {isLoading ? 'Processing...' : mode === 'login' ? 'Login' : 'Sign Up'}
           </button>
         </form>
-
-
 
         <div className="auth-switch-footer">
           {mode === 'login' ? (
@@ -321,3 +333,5 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
+
+export default AuthModal;

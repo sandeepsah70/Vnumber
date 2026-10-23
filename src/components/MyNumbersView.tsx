@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Smartphone, Clock, Copy, MessageSquare, Check } from 'lucide-react';
 import { getStoredMessages, addIncomingOTP } from '../lib/supabase';
 import type { UserNumber, OTPMessage } from '../lib/supabase';
@@ -18,10 +18,20 @@ export const MyNumbersView: React.FC<MyNumbersViewProps> = ({
   );
   const [copiedOtpId, setCopiedOtpId] = useState<string | null>(null);
   const [copiedNumber, setCopiedNumber] = useState(false);
-  const [messages, setMessages] = useState<OTPMessage[]>(() => {
-    return selectedNumber ? getStoredMessages(selectedNumber.phone_number) : getStoredMessages();
-  });
+  const [messages, setMessages] = useState<OTPMessage[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
+
+  useEffect(() => {
+    if (userNumbers.length > 0) {
+      if (!selectedNumber || !userNumbers.some(n => n.id === selectedNumber.id)) {
+        setSelectedNumber(userNumbers[0]);
+        setMessages(getStoredMessages(userNumbers[0].phone_number));
+      }
+    } else {
+      setSelectedNumber(null);
+      setMessages([]);
+    }
+  }, [userNumbers]);
 
   const activeNumbers = userNumbers.filter((n) => n.status === 'Active');
   const expiredNumbers = userNumbers.filter((n) => n.status === 'Expired');

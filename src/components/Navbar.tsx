@@ -21,6 +21,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNavClick = (tab: string) => {
+    // If not logged in and user tries to click private tabs, prompt login
+    if (!isLoggedIn && (tab === 'my-numbers' || tab === 'payments' || tab === 'profile')) {
+      onOpenAuth('login');
+      setMobileMenuOpen(false);
+      return;
+    }
     setCurrentTab(tab);
     setMobileMenuOpen(false);
   };
@@ -47,30 +53,38 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Home
           </button>
+          
           <button
             className={`nav-link ${currentTab === 'buy' ? 'active' : ''}`}
             onClick={() => handleNavClick('buy')}
           >
             Buy Number
           </button>
-          <button
-            className={`nav-link ${currentTab === 'my-numbers' ? 'active' : ''}`}
-            onClick={() => handleNavClick('my-numbers')}
-          >
-            My Numbers
-          </button>
-          <button
-            className={`nav-link ${currentTab === 'payments' ? 'active' : ''}`}
-            onClick={() => handleNavClick('payments')}
-          >
-            Payments
-          </button>
+
           <button
             className={`nav-link ${currentTab === 'features' ? 'active' : ''}`}
             onClick={() => handleNavClick('features')}
           >
             Features
           </button>
+
+          {/* Private tabs: ONLY visible when logged in */}
+          {isLoggedIn && (
+            <>
+              <button
+                className={`nav-link ${currentTab === 'my-numbers' ? 'active' : ''}`}
+                onClick={() => handleNavClick('my-numbers')}
+              >
+                My Numbers
+              </button>
+              <button
+                className={`nav-link ${currentTab === 'payments' ? 'active' : ''}`}
+                onClick={() => handleNavClick('payments')}
+              >
+                Payments
+              </button>
+            </>
+          )}
         </nav>
 
         {/* Right Actions */}
@@ -78,11 +92,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Auth State */}
           {isLoggedIn ? (
             <div className="user-profile-menu">
-              <div className="user-pill" onClick={() => handleNavClick('profile')}>
+              <div className="user-pill" onClick={() => handleNavClick('profile')} title="My Account">
                 <div className="avatar-circle">
-                  {userName.charAt(0).toUpperCase()}
+                  {(userName || 'U').charAt(0).toUpperCase()}
                 </div>
-                <span className="user-name-text">{userName}</span>
+                <span className="user-name-text">{userName || 'Account'}</span>
               </div>
               <button className="logout-icon-btn" onClick={onLogout} title="Logout">
                 <LogOut size={18} />
@@ -128,6 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Home size={18} />
             <span>Home</span>
           </button>
+          
           <button
             className={`mobile-nav-item ${currentTab === 'buy' ? 'active' : ''}`}
             onClick={() => handleNavClick('buy')}
@@ -135,20 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ShoppingCart size={18} />
             <span>Buy Number</span>
           </button>
-          <button
-            className={`mobile-nav-item ${currentTab === 'my-numbers' ? 'active' : ''}`}
-            onClick={() => handleNavClick('my-numbers')}
-          >
-            <Smartphone size={18} />
-            <span>My Numbers</span>
-          </button>
-          <button
-            className={`mobile-nav-item ${currentTab === 'payments' ? 'active' : ''}`}
-            onClick={() => handleNavClick('payments')}
-          >
-            <CreditCard size={18} />
-            <span>Payments</span>
-          </button>
+
           <button
             className={`mobile-nav-item ${currentTab === 'features' ? 'active' : ''}`}
             onClick={() => handleNavClick('features')}
@@ -156,17 +158,72 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Sparkles size={18} />
             <span>Features</span>
           </button>
-          {isLoggedIn && (
-            <button
-              className={`mobile-nav-item ${currentTab === 'profile' ? 'active' : ''}`}
-              onClick={() => handleNavClick('profile')}
-            >
-              <User size={18} />
-              <span>Profile ({userName})</span>
-            </button>
+
+          {/* ONLY show dashboard links if logged in */}
+          {isLoggedIn ? (
+            <>
+              <button
+                className={`mobile-nav-item ${currentTab === 'my-numbers' ? 'active' : ''}`}
+                onClick={() => handleNavClick('my-numbers')}
+              >
+                <Smartphone size={18} />
+                <span>My Numbers</span>
+              </button>
+              <button
+                className={`mobile-nav-item ${currentTab === 'payments' ? 'active' : ''}`}
+                onClick={() => handleNavClick('payments')}
+              >
+                <CreditCard size={18} />
+                <span>Payments</span>
+              </button>
+              <button
+                className={`mobile-nav-item ${currentTab === 'profile' ? 'active' : ''}`}
+                onClick={() => handleNavClick('profile')}
+              >
+                <User size={18} />
+                <span>Profile ({userName})</span>
+              </button>
+              <button
+                className="mobile-nav-item text-red-500"
+                onClick={() => {
+                  onLogout();
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <LogOut size={18} />
+                <span>Logout</span>
+              </button>
+            </>
+          ) : (
+            <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', marginTop: '6px' }}>
+              <button
+                className="btn-login-outline"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAuth('login');
+                }}
+              >
+                <LogIn size={16} />
+                <span>Login</span>
+              </button>
+              <button
+                className="btn-signup-primary"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAuth('signup');
+                }}
+              >
+                <UserPlus size={16} />
+                <span>Sign Up</span>
+              </button>
+            </div>
           )}
         </div>
       )}
     </header>
   );
 };
+
+export default Navbar;

@@ -77,33 +77,29 @@ const LOCAL_STORAGE_KEY_USER_NUMBERS = 'vnumber_user_numbers_v1';
 const LOCAL_STORAGE_KEY_TRANSACTIONS = 'vnumber_transactions_v1';
 const LOCAL_STORAGE_KEY_MESSAGES = 'vnumber_messages_v1';
 
-// Seed demo purchased number if none exist (matching image: +91 98765 43210 Active Expires in 29 Days)
+// Clean up any stale dummy numbers stored in previous sessions
+function cleanStaleDemoData(items: any[], keyField: string, demoVal: string) {
+  return items.filter(item => item[keyField] !== demoVal);
+}
+
 export function getStoredUserNumbers(): UserNumber[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY_USER_NUMBERS);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.error(e);
-  }
-  const defaultNumbers: UserNumber[] = [
-    {
-      id: 'demo-num-1',
-      user_id: 'john-doe',
-      phone_number: '+91 98765 43210',
-      country: 'Indian Number',
-      flag: '🇮🇳',
-      status: 'Active',
-      purchased_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      expires_at: new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString(),
-      expires_in_days: 29,
+    if (raw) {
+      const parsed: UserNumber[] = JSON.parse(raw);
+      // Filter out any past demo number
+      const cleaned = cleanStaleDemoData(parsed, 'id', 'demo-num-1').filter(
+        n => n.phone_number !== '+91 98765 43210'
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(LOCAL_STORAGE_KEY_USER_NUMBERS, JSON.stringify(cleaned));
+      }
+      return cleaned;
     }
-  ];
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_USER_NUMBERS, JSON.stringify(defaultNumbers));
   } catch (e) {
     console.error(e);
   }
-  return defaultNumbers;
+  return [];
 }
 
 export function saveUserNumber(num: UserNumber) {
@@ -116,29 +112,20 @@ export function saveUserNumber(num: UserNumber) {
 export function getStoredTransactions(): PaymentTransaction[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY_TRANSACTIONS);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.error(e);
-  }
-  const defaultTx: PaymentTransaction[] = [
-    {
-      id: 'tx_01',
-      user_id: 'john-doe',
-      phone_number: '+91 98765 43210',
-      amount: 150,
-      currency: '₹',
-      payment_method: 'UPI (GPay)',
-      status: 'Success',
-      transaction_ref: 'UPI-' + Math.floor(100000 + Math.random() * 900000),
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    if (raw) {
+      const parsed: PaymentTransaction[] = JSON.parse(raw);
+      const cleaned = cleanStaleDemoData(parsed, 'id', 'tx_01').filter(
+        t => t.phone_number !== '+91 98765 43210'
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(LOCAL_STORAGE_KEY_TRANSACTIONS, JSON.stringify(cleaned));
+      }
+      return cleaned;
     }
-  ];
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_TRANSACTIONS, JSON.stringify(defaultTx));
   } catch (e) {
     console.error(e);
   }
-  return defaultTx;
+  return [];
 }
 
 export function saveTransaction(tx: PaymentTransaction) {
